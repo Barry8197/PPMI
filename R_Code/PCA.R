@@ -1,6 +1,8 @@
+library(edgeR) #expression normalization
+library(devtools)
+install_github("vqv/ggbiplot")
+library(ggbiplot)
 library(DESeq2)
-library(ggplot2)
-
 
 # Pull in Count Matrices --------------------------------------------------
 count_mtx <- NA
@@ -48,30 +50,16 @@ keep <- filterByExpr(count_mtx, group = PD_status)
 sum(keep) #18996 genes
 
 
-# Perform Differential Gene Expression ------------------------------------
+# Obtain R Log  ------------------------------------
 dds = DESeqDataSetFromMatrix(countData = count_mtx[keep,], colData = coldata , design = ~0  + sex + plate + age + usableBases + PD_status)
+rld <- rlog(dds , blind = FALSE)
 
-dds = DESeq(dds)
+
+# Perform PCA -------------------------------------------------------------
+coldata.pca <- prcomp(count_mtx[keep,] , scale = TRUE , center = TRUE)
+summary(coldata.pca)
 
 
-# Identify differentially expressed genes and visualize -------------------
-DE_info = results(dds)
+# Visualise PCA -----------------------------------------------------------
+ggbiplot(pca)
 
-de <- as.data.frame(DE_info)
-de$diffexpressed <- "NO"
-# if log2Foldchange > 0.1 and adjusted pvalue < 0.05, set as "UP" 
-de$diffexpressed[de$log2FoldChange > 0.1 & de$padj < 0.05] <- "UP"
-# if log2Foldchange < -0.1 and adjusted pvalue < 0.05, set as "DOWN"
-de$diffexpressed[de$log2FoldChange < -0.1 & de$padj < 0.05] <- "DOWN"
-de$delabel <- NA
-de$delabel[de$diffexpressed != "NO"] <- rownames(de)[de$diffexpressed != "NO"]
-
-ggplot(data=de, aes(x=log2FoldChange, y=-log10(padj), col=diffexpressed , label=delabel)) +
-  geom_point() + 
-  theme_minimal() +
-  scale_color_manual(values=c("blue", "black", "red")) +
-  geom_vline(xintercept=c(-0.1, 0.1), col="red") +
-  geom_hline(yintercept=-log10(0.05), col="red") + 
-  ggtitle('Case-Control Volcano Plot DESeq') + theme(plot.title = element_text(hjust = 0.5))
-
-write.csv(de , file = './PPMI_IP/output/case_control_deseq.csv')

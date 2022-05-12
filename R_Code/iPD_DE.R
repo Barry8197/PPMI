@@ -1,5 +1,6 @@
 library(DESeq2)
 library(variancePartition)
+library(ggplot2)
 
 count_mtx_PD <- NA
 for (DS in c('Idiopathic_PD' , 'Genetic_PD')) {
@@ -87,7 +88,7 @@ dds = DESeq(dds)
 #DE_info = results(dds , lfcThreshold = 0 , altHypothesis = 'greaterAbs')
 DE_info = results(dds)
 
-library(ggplot2)
+
 
 de <- as.data.frame(DE_info)
 de$diffexpressed <- "NO"
