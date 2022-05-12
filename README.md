@@ -22,3 +22,11 @@ Looking to replicate the case-control results from [PPMI RNA-Seq Whole Genome Pa
 #### Subsetting_Data_By_Cohort_Month.py
 Note : Needs to be updated
 1. Subsets raw count matrices into relative sub-folders as per below image ![count_matrix_creation](./images/count_matrix_sep.png)
+
+#### joined_meta_file.ipynb
+1. Used to combine meta data files to include usable bases in experiments 
+
+#### Paper_Limma_Deseq_Analysis.ipynb
+1. Similarity comparison between DESeq, Limma and reported paper results
+2. Similarity in number and what genes are differentially expressed
+3. Correlation between Log Fold Changes in all results
