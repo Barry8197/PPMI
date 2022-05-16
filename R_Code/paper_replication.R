@@ -3,10 +3,6 @@ library(tidyr) #for pivot tables
 library(edgeR) #expression normalization
 library(limma) #more expression normalization
 library(corrplot) #correlation plot matrix
-library(beepr) #beep alerts when job is complete
-library(ggpubr) #paper level visuals
-library(seqsetvis) #ggplot2 venn
-
 
 # Pull in Count Matrices --------------------------------------------------
 count_mtx <- NA
@@ -108,7 +104,8 @@ ggplot(data=df, aes(x=logFC, y=-log10(adj.P.Val), col=diffexpressed , label=dela
   scale_color_manual(values=c("blue", "black", "red")) +
   geom_vline(xintercept=c(-0.1, 0.1), col="red") +
   geom_hline(yintercept=-log10(0.05), col="red") + 
-  ggtitle('Case-Control Volcano Plot Limma-Fit') + theme(plot.title = element_text(hjust = 0.5))
+  ggtitle('Case-Control Volcano Plot Limma-Fit') + theme(plot.title = element_text(hjust = 0.5)) + 
+  ylim(c(0,15))
 
 write.csv(df , file = './PPMI_IP/output/case_control_limma.csv')
 

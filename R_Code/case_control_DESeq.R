@@ -72,6 +72,7 @@ ggplot(data=de, aes(x=log2FoldChange, y=-log10(padj), col=diffexpressed , label=
   scale_color_manual(values=c("blue", "black", "red")) +
   geom_vline(xintercept=c(-0.1, 0.1), col="red") +
   geom_hline(yintercept=-log10(0.05), col="red") + 
-  ggtitle('Case-Control Volcano Plot DESeq') + theme(plot.title = element_text(hjust = 0.5))
+  ggtitle('Case-Control Volcano Plot DESeq') + theme(plot.title = element_text(hjust = 0.5)) + 
+  xlim(c(-0.75,0.5))
 
 write.csv(de , file = './PPMI_IP/output/case_control_deseq.csv')
