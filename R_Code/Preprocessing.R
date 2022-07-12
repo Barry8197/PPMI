@@ -8,19 +8,20 @@ library(kableExtra)
 library(plotly)
 library(vsn)
 library(tibble)
+library(pheatmap)
 
 setwd('~/PPMI_IP/R_Code/')
 
 # Pull in Count Matrices --------------------------------------------------
 print('Pull in Raw Feature Counts')
 count_mtx <- NA
-for (DS in c('Idiopathic_PD' ,'Healthy_Control')) {
+for (DS in c('Healthy_Control')) {
   print(DS)
-  for (i in list.files(paste0('./../Data/Count_Data/Raw_Counts_TS/',DS,'/'))[c(5)]) {
-    print(i)
-    count_mtx_tmp <- read.csv(paste0('~/PPMI_IP/Data/Count_Data/Raw_Counts_TS/',DS,'/',i,'/count_matrix.csv') , check.names = FALSE)
-    count_mtx <- cbind(count_mtx_tmp[sample(colnames(count_mtx_tmp[,2:length(count_mtx_tmp)]) , 150)] , count_mtx) 
-    #count_mtx <- cbind(count_mtx_tmp[,2:length(count_mtx_tmp)] , count_mtx) 
+  for (TS in list.files(paste0('./../Data/Count_Data/Raw_Counts_TS/',DS,'/'))[c(3)]) {
+    print(TS)
+    count_mtx_tmp <- read.csv(paste0('~/PPMI_IP/Data/Count_Data/Raw_Counts_TS/',DS,'/',TS,'/count_matrix.csv') , check.names = FALSE)
+    #count_mtx <- cbind(count_mtx_tmp[sample(colnames(count_mtx_tmp[,2:length(count_mtx_tmp)]) , 190)] , count_mtx) 
+    count_mtx <- cbind(count_mtx_tmp[,2:length(count_mtx_tmp)] , count_mtx) 
   }
 }
 rownames(count_mtx) <- count_mtx_tmp$Geneid #add gene ids to rownames
@@ -31,6 +32,7 @@ rm(count_mtx_tmp)
 # count_mtx <- count_mtx[genes_subset , ]
 count_mtx <- count_mtx[,1:length(colnames(count_mtx))-1]
 
+count_mtx <- cbind(count_mtx , count_mtx_iPD)
 # Create coldata and condition table --------------------------------------
 print('Create Coldata and Conditions')
 meta_df <- read.csv('./../Data/meta_files/metadata_final.csv')
@@ -59,7 +61,7 @@ usableBases <- meta_df$Usable_Bases
 coldata <- data.frame( meta_df$HudAlphaSampleName , meta_df$PATNO , meta_df$Genetic_Status , meta_df$Clinical_Event, sex , age ,plate , usableBases, PD_status ,  row.names = names(count_mtx))
 
 rm(meta_df)
-
+save(count_mtx , coldata , file = './../iPD_HC/preprocessedData/V04/raw_counts.RData')
 # Count Distribution ------------------------------------------------------
 counts = count_mtx %>% melt
 
@@ -78,6 +80,7 @@ rm(counts, count_distr)
 
 
 # Remove Genes with low level of expression -------------------------------
+load('./../gPD_HC/preprocessedData/V08/raw_counts.RData')
 to_keep = rowSums(count_mtx) > 0 #removed 1157 genes
 length(to_keep) - sum(to_keep)
 
@@ -85,9 +88,9 @@ count_mtx <- count_mtx[to_keep,]
 
 datExpr <- count_mtx
 datMeta <- coldata
-datMeta_original = datMeta
-datExpr_original = datExpr
-
+#datMeta_original = datMeta
+#datExpr_original = datExpr
+#
 # thresholds = round(100*(88-c(seq(72,7,-5),5,3,2,0))/88)
 # 
 # for(threshold in thresholds){
@@ -166,13 +169,13 @@ datExpr_original = datExpr
 #threshold = 99.7
 
 #to_keep = apply(datExpr, 1, function(x) 100*mean(x>0)) >= threshold
-to_keep = filterByExpr(datExpr , group = PD_status)
+to_keep = filterByExpr(datExpr , group = coldata$PD_status)
 print('keeping genes')
 print(sum(to_keep))
-#length(to_keep) - sum(to_keep)
+length(to_keep) - sum(to_keep)
 count_mtx = count_mtx[to_keep,]
 
-rm(datExpr_original, datMeta_original, threshold, to_keep , datExpr , datMeta)
+rm( to_keep , datExpr , datMeta)
 
 
 # Remove Outliers ---------------------------------------------------------
@@ -199,8 +202,9 @@ coldata <- coldata[to_keep,]
 
 rm(absadj, netsummary, ku, z.ku, plot_data , to_keep)
 
-save(count_mtx, coldata, file='./../Data/preprocessedData/filtered_raw_data.RData')
-load('./../Data/preprocessedData/filtered_raw_data.RData')
+TS <- unique(coldata$meta_df.Clinical_Event)
+save(count_mtx, coldata, file=paste0('./../gPD_HC/preprocessedData/',TS,'/raw.RData')) #22098 genes 253 samples 54.6% affected
+load('./../gPD_HC/preprocessedData/V08/raw.RData')
 
 
 # Normalisation Using DESeq -----------------------------------------------
@@ -211,7 +215,23 @@ plot_data %>% ggplot(aes(Mean, SD)) + geom_point(color='#0099cc', alpha=0.1) + g
 
 rm(plot_data)
 
-dds = DESeqDataSetFromMatrix(countData = count_mtx, colData = coldata , design = ~ usableBases + sex + age + plate  + PD_status)
+
+# Design Matrix Correlations ----------------------------------------------
+out <- c()
+for (i in c(5,6,7,8,9)) {
+  row_tmp <- c()
+  for (a in c(5,6,7,8,9)) {
+    row_tmp <- rbind(row_tmp , cor(as.numeric(coldata[,i]) , as.numeric(coldata[,a])))
+  }
+  out <- cbind(out , row_tmp)
+}
+rownames(out) <- colnames(coldata[, c(5,6,7,8,9)])
+colnames(out) <- colnames(coldata[, c(5,6,7,8,9)])
+pal <- wes_palette("Zissou1", 100, type = "continuous")
+pheatmap(round(out,2) , cluster_rows = FALSE , cluster_cols = FALSE , display_numbers = round(out , 2) )
+out
+
+dds = DESeqDataSetFromMatrix(countData = count_mtx, colData = coldata , design = ~ PD_status)
 
 print('performing DESeq')
 dds = DESeq(dds)
@@ -220,8 +240,8 @@ dds = DESeq(dds)
 DE_info = results(dds)
 DESeq2::plotMA(DE_info, main= 'Original LFC values')
 
-#DE_info_shrunken = lfcShrink(dds, coef='PD_statusAffected', res = DE_info, lfcThreshold=0)
-#plotMA(DE_info_shrunken, main = 'Shrunken LFC values')
+DE_info_shrunken = lfcShrink(dds, coef='PD_status_Affected_vs_Unaffected', res = DE_info, lfcThreshold=0)
+DESeq2::plotMA(DE_info_shrunken, main = 'Shrunken LFC values')
 
 rm(DE_info , DE_info_shrunken)
 # VST Transformation of Data ----------------------------------------------
@@ -250,18 +270,21 @@ rm(datExpr_vst, datMeta_vst , count_mtx , coldata)
 
 genes_info = DE_info %>% data.frame  %>% 
   mutate(significant=padj<0.05 & !is.na(padj) )
+genes_info$ID <- rownames(genes_info)
+genes_info$ID <- gsub("\\..*","", genes_info$ID)
 #%>%
 #   cbind(DE_info_shrunken %>% data.frame %>% dplyr::select(log2FoldChange, lfcSE) %>% 
 #           dplyr::rename('shrunken_log2FoldChange' = log2FoldChange, 'shrunken_lfcSE' = lfcSE)) %>%
 #   add_column('ID'=rownames(DE_info), .before='baseMean')
+# 
+# counts = datExpr %>% data.frame %>% melt
+# 
+# count_distr = data.frame('Statistic' = c('Min', '1st Quartile', 'Median', 'Mean', '3rd Quartile', 'Max'),
+#                           'Values' = c(min(counts$value), quantile(counts$value, probs = c(.25, .5)) %>% unname,
+#                                        mean(counts$value), quantile(counts$value, probs = c(.75)) %>% unname,
+#                                        max(counts$value)))
+# 
+# count_distr %>% kable(digits = 2, format.args = list(scientific = FALSE)) %>% kable_styling(full_width = F)
 
-counts = datExpr %>% data.frame %>% melt
-
-count_distr = data.frame('Statistic' = c('Min', '1st Quartile', 'Median', 'Mean', '3rd Quartile', 'Max'),
-                          'Values' = c(min(counts$value), quantile(counts$value, probs = c(.25, .5)) %>% unname,
-                                       mean(counts$value), quantile(counts$value, probs = c(.75)) %>% unname,
-                                       max(counts$value)))
-
-count_distr %>% kable(digits = 2, format.args = list(scientific = FALSE)) %>% kable_styling(full_width = F)
-
-save(datExpr, datMeta, dds, genes_info, file='./../Data/preprocessedData/preprocessed_gPD_BL.RData')
+TS <- unique(datMeta$meta_df.Clinical_Event)
+save(datExpr, datMeta, dds, genes_info, file=paste0('./../gPD_HC/preprocessedData/',TS,'/preprocessed2.RData'))
